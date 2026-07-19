@@ -1,11 +1,11 @@
-name: 定时更新ETF数据
+name: 定时更新ETF数据（东方财富数据源）
 
 on:
   schedule:
-    - cron: '35 6 * * 1-5'   # UTC 6:35 = 北京时间14:35
-    - cron: '30 1 * * 1-5'   # UTC 1:30 = 北京时间9:30
-    - cron: '0 3 * * 1-5'    # UTC 3:00 = 北京时间11:00
-    - cron: '0 5 * * 1-5'    # UTC 5:00 = 北京时间13:00
+    - cron: '35 6 * * 1-5'    # UTC 6:35 = 北京时间 14:35
+    - cron: '30 1 * * 1-5'    # UTC 1:30 = 北京时间 9:30
+    - cron: '0 3 * * 1-5'     # UTC 3:00 = 北京时间 11:00
+    - cron: '0 5 * * 1-5'     # UTC 5:00 = 北京时间 13:00
   workflow_dispatch:
 
 jobs:
@@ -17,19 +17,37 @@ jobs:
         with:
           python-version: '3.11'
       
-      - name: 获取ETF数据
+      - name: 从东方财富获取数据并计算信号
         run: |
           python -c "
 import json, urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import defaultdict
 
-ETFS = ['589720','159611','588170','515050','159819','159852','159869','512400','512710','515400','561380','563230']
+# ETF代码列表（上海=1，深圳=0）
+ETFS = {
+    '589720': (1, '科创创新药'), '159611': (0, '广发电力'),
+    '588170': (1, '科创半导体'), '515050': (1, '通信'),
+    '159819': (0, '人工智能'),   '159852': (0, '软件'),
+    '159869': (0, '游戏'),       '512400': (1, '有色'),
+    '512710': (1, '军工龙头'),   '515400': (1, '大数据'),
+    '561380': (1, '电网设备'),   '563230': (1, '卫星'),
+}
 
 def fetch(url):
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req, timeout=20) as resp:
         return json.loads(resp.read().decode('utf-8'))
+
+def parse_klines(klines):
+    closes = []
+    times = []
+    for k in klines:
+        parts = k.split(',')
+        if len(parts) >= 3:
+            times.append(parts[0])
+            closes.append(float(parts[2]))
+    return closes, times
 
 def ma(d, p):
     r = []
@@ -38,44 +56,50 @@ def ma(d, p):
     return r
 
 results = []
-for code in ETFS:
+for code, (market, name) in ETFS.items():
     try:
-        d5 = fetch(f'https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketData.getKLineData?symbol=sh{code}&scale=5&datalen=100')
-        d120 = fetch(f'https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketData.getKLineData?symbol=sh{code}&scale=120&datalen=120')
+        # 5分钟数据
+        url5 = f'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid={market}.{code}&klt=5&fqt=1&lmt=100&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56'
+        raw5 = fetch(url5)
+        if not raw5 or 'data' not in raw5 or not raw5['data']:
+            print(f'{code}: no 5min data'); continue
+        c5, t5 = parse_klines(raw5['data'].get('klines', []) or [])
+        if len(c5) < 20:
+            print(f'{code}: 5min data too short ({len(c5)})'); continue
         
-        if len(d5)<20 or len(d120)<60:
-            print(f'{code}: data too short')
-            continue
+        # 120分钟数据
+        url120 = f'https://push2his.eastmoney.com/api/qt/stock/kline/get?secid={market}.{code}&klt=120&fqt=1&lmt=120&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56'
+        raw120 = fetch(url120)
+        if not raw120 or 'data' not in raw120 or not raw120['data']:
+            print(f'{code}: no 120min data'); continue
+        c120, t120 = parse_klines(raw120['data'].get('klines', []) or [])
+        if len(c120) < 60:
+            print(f'{code}: 120min data too short ({len(c120)})'); continue
         
-        c5 = [float(x['close']) for x in d5]
-        t5 = [x['day'] for x in d5]
-        c120 = [float(x['close']) for x in d120]
-        t120 = [x['day'] for x in d120]
+        ma5_5 = ma(c5, 5); ma60_5 = ma(c5, 60)
+        ma5_120 = ma(c120, 5); ma60_120 = ma(c120, 60)
         
-        ma5_5 = ma(c5,5); ma60_5 = ma(c5,60)
-        ma5_120 = ma(c120,5); ma60_120 = ma(c120,60)
-        
+        # 120分钟方向
         dir120 = {}
         for i in range(len(t120)):
             if ma5_120[i] and ma60_120[i]:
                 dir120[t120[i]] = ma5_120[i] > ma60_120[i]
         
         def get_dir(ts):
-            dt = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+            dt = datetime.strptime(ts, '%Y-%m-%d %H:%M')
             best, bd = None, None
             for k in dir120:
-                kdt = datetime.strptime(k, '%Y-%m-%d %H:%M:%S')
+                kdt = datetime.strptime(k, '%Y-%m-%d %H:%M')
                 if kdt <= dt and (bd is None or kdt > bd): best, bd = k, kdt
             return dir120[best] if best else None
         
         cur_dir = get_dir(t5[-1])
-        mv = ma5_5[-1] or 0
-        m60v = ma60_5[-1] or 0
-        price = c5[-1]
+        mv = ma5_5[-1] or 0; m60v = ma60_5[-1] or 0; price = c5[-1]
         direction = '多头' if cur_dir else '空头'
         signal = '空仓'
         if cur_dir and mv > m60v: signal = '买入'
         
+        # 查找上次盈亏
         daily = defaultdict(list)
         for i in range(len(t5)): daily[t5[i][:10]].append(i)
         last_pnl = 0; pos = False; ep = 0; sd = ''
@@ -91,21 +115,22 @@ for code in ETFS:
                 if mv2 < m60v2 and day != sd: last_pnl = (p-ep)/ep*100; pos = False; sd = day
         if pos: last_pnl = (c5[-1]-ep)/ep*100
         
-        results.append({'code':code,'price':round(price,3),'direction':direction,'ma5':round(mv,3),
-                        'ma60':round(m60v,3),'signal':signal,'last_pnl':round(last_pnl,2)})
-        print(f'{code}: {signal} {direction} {price}')
+        results.append({'code':code, 'name':name, 'price':round(price,3), 'direction':direction,
+                        'ma5':round(mv,3), 'ma60':round(m60v,3), 'signal':signal, 'last_pnl':round(last_pnl,2)})
+        print(f'{code} {name}: {signal} {direction} {price:.3f}')
     except Exception as e:
         print(f'{code} error: {e}')
 
 data = {'update_time': datetime.now().strftime('%Y-%m-%d %H:%M'), 'etfs': results}
-with open('data.json', 'w') as f: json.dump(data, f, ensure_ascii=False, indent=2)
-print(f'Updated {len(results)} ETFs')
+with open('data.json', 'w') as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+print(f'Done: {len(results)} ETFs updated')
 "
       
-      - name: 提交更新
+      - name: 提交到GitHub
         run: |
           git config user.name 'ETF Bot'
           git config user.email 'bot@etf-signal'
           git add data.json
-          git diff --quiet && git diff --staged --quiet || git commit -m 'auto update ETF data'
+          git diff --quiet && git diff --staged --quiet || git commit -m 'auto: 东方财富数据更新'
           git push
