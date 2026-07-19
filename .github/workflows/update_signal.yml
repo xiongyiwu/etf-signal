@@ -1,0 +1,142 @@
+name: 更新ETF信号
+
+on:
+  schedule:
+    - cron: '35 6 * * 1-5'  # 每天14:35北京时间(GMT+8) = 06:35 UTC, 周一到周五
+  workflow_dispatch:  # 可手动触发
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 获取数据并更新信号
+        run: |
+          python -c "
+import json, urllib.request
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+ETFS = {
+    '589720': {'name': '科创创新药ETF'},
+    '159611': {'name': '广发电力ETF'},
+    '588170': {'name': '科创半导体ETF'},
+    '515050': {'name': '通信ETF'},
+}
+
+def fetch(url):
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return json.loads(resp.read().decode('utf-8'))
+
+def ma(d, p):
+    r = []
+    for i in range(len(d)):
+        r.append(sum(d[i-p+1:i+1])/p if i >= p-1 else None)
+    return r
+
+results = []
+for code, info in ETFS.items():
+    try:
+        d5 = fetch(f'https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketData.getKLineData?symbol=sh{code}&scale=5&datalen=100')
+        d120 = fetch(f'https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketData.getKLineData?symbol=sh{code}&scale=120&datalen=100')
+        
+        c5 = [float(x['close']) for x in d5]
+        t5 = [x['day'] for x in d5]
+        c120 = [float(x['close']) for x in d120]
+        t120 = [x['day'] for x in d120]
+        
+        m5_5 = ma(c5, 5)
+        m60_5 = ma(c5, 60)
+        m5_120 = ma(c120, 5)
+        m60_120 = ma(c120, 60)
+        
+        dir120 = {}
+        for i in range(len(t120)):
+            if m5_120[i] and m60_120[i]:
+                dir120[t120[i]] = m5_120[i] > m60_120[i]
+        
+        def get_dir(ts):
+            dt = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+            best, bd = None, None
+            for k in dir120:
+                kdt = datetime.strptime(k, '%Y-%m-%d %H:%M:%S')
+                if kdt <= dt and (bd is None or kdt > bd):
+                    best, bd = k, kdt
+            return dir120[best] if best else None
+        
+        cur_dir = get_dir(t5[-1])
+        mv = m5_5[-1] or 0
+        m60v = m60_5[-1] or 0
+        price = c5[-1]
+        
+        direction = '多头' if cur_dir else '空头'
+        signal = '持仓' if (cur_dir and mv > m60v) else '空仓'
+        
+        # 找上次交易盈亏
+        daily = defaultdict(list)
+        for i in range(len(t5)):
+            daily[t5[i][:10]].append(i)
+        
+        last_pnl = 0
+        pos = False
+        ep = 0
+        signal_day = ''
+        for day in sorted(daily.keys()):
+            idxs = daily[day]
+            last = idxs[-1]
+            d_dir = get_dir(t5[last])
+            if d_dir is None: continue
+            mv2 = m5_5[last]
+            m60v2 = m60_5[last]
+            p = c5[last]
+            if mv2 is None or m60v2 is None: continue
+            if not pos:
+                if d_dir and mv2 > m60v2 and day != signal_day:
+                    pos = True
+                    ep = p
+                    signal_day = day
+            else:
+                if mv2 < m60v2 and day != signal_day:
+                    last_pnl = (p - ep) / ep * 100
+                    pos = False
+                    signal_day = day
+        if pos:
+            last_pnl = (c5[-1] - ep) / ep * 100
+        
+        results.append({
+            'code': code,
+            'name': info['name'],
+            'price': round(price, 3),
+            'direction': direction,
+            'ma5': round(mv, 3),
+            'ma60': round(m60v, 3),
+            'signal': signal,
+            'last_pnl': round(last_pnl, 2),
+        })
+        print(f'{info[\"name\"]}: {signal} {direction} {price}')
+    except Exception as e:
+        print(f'{code} error: {e}')
+
+# 更新data.json
+data = {
+    'update_time': datetime.now().strftime('%Y-%m-%d %H:%M'),
+    'etfs': results,
+}
+with open('data.json', 'w') as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+print('data.json updated')
+"
+      
+      - name: 提交更新
+        run: |
+          git config user.name 'ETF Bot'
+          git config user.email 'bot@etf-signal'
+          git add data.json
+          git diff --quiet && git diff --staged --quiet || git commit -m '自动更新ETF信号'
+          git push

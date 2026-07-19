@@ -1,0 +1,45 @@
+{
+  "update_time": "2026-07-18 14:35",
+  "etfs": [
+    {
+      "code": "589720",
+      "name": "科创创新药ETF",
+      "price": 0.895,
+      "direction": "多头",
+      "ma5": 0.903,
+      "ma60": 0.925,
+      "signal": "空仓",
+      "last_pnl": 4.53
+    },
+    {
+      "code": "159611",
+      "name": "广发电力ETF",
+      "price": 1.031,
+      "direction": "多头",
+      "ma5": 1.033,
+      "ma60": 1.029,
+      "signal": "空仓",
+      "last_pnl": -0.73
+    },
+    {
+      "code": "588170",
+      "name": "科创半导体ETF",
+      "price": 0.971,
+      "direction": "多头",
+      "ma5": 0.986,
+      "ma60": 1.018,
+      "signal": "空仓",
+      "last_pnl": -7.72
+    },
+    {
+      "code": "515050",
+      "name": "通信ETF",
+      "price": 1.055,
+      "direction": "多头",
+      "ma5": 1.063,
+      "ma60": 1.097,
+      "signal": "空仓",
+      "last_pnl": -0.15
+    }
+  ]
+}
