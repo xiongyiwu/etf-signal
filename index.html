@@ -2,62 +2,299 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ETF信号监控</title>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>ETF 信号监测站</title>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{background:#0d1117;color:#c9d1d9;font-family:-apple-system,'Microsoft YaHei',sans-serif;padding:16px;min-height:100vh}
-  h1{font-size:20px;margin:10px 0 16px;text-align:center;color:#58a6ff;font-weight:600}
-  .date{text-align:center;color:#8b949e;font-size:13px;margin-bottom:16px}
-  .card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:16px;margin-bottom:12px}
-  .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-  .card-name{font-size:16px;font-weight:600;color:#c9d1d9}
-  .card-code{font-size:12px;color:#8b949e;margin-left:6px}
-  .tag{font-size:12px;padding:3px 10px;border-radius:10px;font-weight:600}
-  .tag-bull{background:#003d1f;color:#3fb950;border:1px solid #3fb950}
-  .tag-bear{background:#3d0000;color:#f85149;border:1px solid #f85149}
-  .tag-hold{background:#003d1f;color:#3fb950;border:1px solid #3fb950}
-  .tag-wait{background:#1c1c00;color:#d29922;border:1px solid #d29922}
-  .info-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}
-  .info-label{color:#8b949e}
-  .info-value{color:#c9d1d9;font-weight:500}
-  .info-value.green{color:#3fb950}
-  .info-value.red{color:#f85149}
-  .info-value.yellow{color:#d29922}
-  .last-time{text-align:center;color:#484f58;font-size:11px;margin-top:16px}
+:root{ --bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--dim:#8b949e;--link:#58a6ff;--green:#3fb950;--red:#f85149;--gold:#d29922;--accent:#238636 }
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Microsoft YaHei',sans-serif;min-height:100vh}
+.container{max-width:680px;margin:0 auto;padding:16px}
+
+header{text-align:center;padding:20px 0 12px}
+header h1{font-size:22px;color:var(--link);font-weight:700;letter-spacing:-0.5px}
+header .sub{font-size:12px;color:var(--dim);margin-top:4px}
+
+.toolbar{display:flex;justify-content:space-between;align-items:center;padding:10px 0;gap:8px}
+.toolbar .time{font-size:11px;color:var(--dim);flex:1}
+.btn{padding:7px 16px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all .2s}
+.btn-pri{background:var(--accent);color:#fff}
+.btn-pri:hover{background:#2ea043;transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--link);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--link)}
+.btn-danger{background:transparent;color:var(--dim);border:none;font-size:14px;padding:2px 6px;opacity:0}
+.btn-danger:hover{color:var(--red);opacity:1}
+
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.stat-card .num{font-size:24px;font-weight:700}
+.stat-card .label{font-size:11px;color:var(--dim);margin-top:2px}
+.stat-buy .num{color:var(--red)}
+.stat-hold .num{color:var(--gold)}
+.stat-wait .num{color:var(--green)}
+
+.etf-list{display:flex;flex-direction:column;gap:6px}
+.etf-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;transition:all .2s;position:relative;overflow:hidden}
+.etf-card:hover{border-color:var(--link);box-shadow:0 0 20px rgba(88,166,255,0.06)}
+.etf-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px}
+.etf-card.buy::before{background:var(--red)}
+.etf-card.hold::before{background:var(--gold)}
+.etf-card.wait::before{background:var(--green)}
+.etf-card .row{display:flex;align-items:center;gap:8px}
+.etf-card .info{flex:1;min-width:0}
+.etf-card .name{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.etf-card .code{font-size:11px;color:var(--dim);margin-left:4px}
+.etf-card .badge{font-size:10px;padding:3px 10px;border-radius:12px;font-weight:700;white-space:nowrap}
+.badge-buy{background:rgba(248,81,73,0.15);color:var(--red)}
+.badge-hold{background:rgba(210,153,34,0.15);color:var(--gold)}
+.badge-wait{background:rgba(63,185,80,0.15);color:var(--green)}
+
+.etf-card .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;font-size:12px}
+.etf-card .item .lbl{color:var(--dim);font-size:10px}
+.etf-card .item .val{font-weight:600}
+.etf-card .item .val.red{color:var(--red)}
+.etf-card .item .val.green{color:var(--green)}
+.etf-card .item .val.gold{color:var(--gold)}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.show{opacity:1;pointer-events:auto}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:90%;max-width:400px}
+.modal h3{font-size:16px;margin-bottom:16px;color:var(--text)}
+.modal input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;margin-bottom:12px}
+.modal input:focus{border-color:var(--link)}
+.modal .hint{font-size:11px;color:var(--dim);margin-bottom:12px}
+.modal .btn-row{display:flex;gap:8px;justify-content:flex-end}
+
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--link);border-radius:50%;animation:spin .6s linear infinite;margin:40px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.footer{text-align:center;padding:20px;color:#21262d;font-size:10px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--dim)}
+.empty-state .icon{font-size:40px;margin-bottom:12px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--border);padding:10px 20px;border-radius:8px;font-size:13px;z-index:200;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
 </style>
 </head>
 <body>
-<h1>ETF 信号监控</h1>
-<div class="date" id="updateTime">加载中...</div>
-<div id="cards"><div style="text-align:center;padding:40px;color:#8b949e">加载中...</div></div>
-<div class="last-time">规则: 120分MA5/MA60定方向 + 5分MA5/MA60交叉</div>
+<div class="container">
+  <header>
+    <h1>📡 ETF 信号监测站</h1>
+    <div class="sub">120分定方向 · 5分MA交叉 · 实时信号</div>
+  </header>
+  
+  <div class="toolbar">
+    <div class="time" id="time">---</div>
+    <button class="btn btn-ghost" onclick="refresh()">⟳ 刷新</button>
+    <button class="btn btn-pri" onclick="showModal()">+ 添加ETF</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card stat-buy"><div class="num" id="cntBuy">0</div><div class="label">买入信号</div></div>
+    <div class="stat-card stat-hold"><div class="num" id="cntHold">0</div><div class="label">持仓中</div></div>
+    <div class="stat-card stat-wait"><div class="num" id="cntWait">0</div><div class="label">空仓</div></div>
+  </div>
+
+  <div class="etf-list" id="list"></div>
+  <div class="footer">数据实时计算 · 跌🟢涨🔴 · 任何时候任何城市都能访问</div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>添加ETF</h3>
+    <input id="codeInput" placeholder="输入6位ETF代码, 多个用逗号分隔" onkeydown="if(event.key=='Enter')addETF()">
+    <div class="hint">沪市ETF直接输入代码即可<br>支持同时添加多个，如: 512400,159819</div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="hideModal()">取消</button>
+      <button class="btn btn-pri" onclick="addETF()">添加</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-async function loadData(){
-  try{
-    const r=await fetch('data.json?_t='+Date.now());
-    const d=await r.json();
-    document.getElementById('updateTime').textContent='更新: '+(d.update_time||'--');
-    let html='';
-    for(const e of d.etfs){
-      const dirTag=e.direction==='多头'?'<span class="tag tag-bull">多头</span>':'<span class="tag tag-bear">空头</span>';
-      const sigTag=e.signal==='持仓'?'<span class="tag tag-hold">持仓</span>':'<span class="tag tag-wait">空仓</span>';
-      const pc=e.last_pnl>0?'green':(e.last_pnl<0?'red':'yellow');
-      html+='<div class="card"><div class="card-header"><div><span class="card-name">'+e.name+'</span><span class="card-code">'+e.code+'</span></div>'+sigTag+'</div>'+
-        '<div class="info-row"><span class="info-label">当前价</span><span class="info-value">'+e.price.toFixed(3)+'</span></div>'+
-        '<div class="info-row"><span class="info-label">120分钟</span><span>'+dirTag+'</span></div>'+
-        '<div class="info-row"><span class="info-label">MA5</span><span class="info-value">'+e.ma5.toFixed(3)+'</span></div>'+
-        '<div class="info-row"><span class="info-label">MA60</span><span class="info-value">'+e.ma60.toFixed(3)+'</span></div>'+
-        '<div class="info-row"><span class="info-label">上次盈亏</span><span class="info-value '+pc+'">'+(e.last_pnl>0?'+':'')+e.last_pnl.toFixed(2)+'%</span></div></div>';
-    }
-    document.getElementById('cards').innerHTML=html;
-  }catch(e){
-    document.getElementById('cards').innerHTML='<div style="text-align:center;padding:40px;color:#f85149">数据加载失败，请刷新</div>';
-  }
+const builtin = ['589720','159611','588170','515050','159819','159852','159869','512400','512710','515400','561380','563230'];
+const names = {589720:'科创创新药',159611:'广发电力',588170:'科创半导体',515050:'通信',159819:'人工智能',159852:'软件',159869:'游戏',512400:'有色',512710:'军工龙头',515400:'大数据',561380:'电网设备',563230:'卫星'};
+
+function getList(){
+  let s = localStorage.getItem('etf_list');
+  let custom = s ? JSON.parse(s) : [];
+  return [...new Set([...builtin, ...custom])];
 }
-loadData();
-setInterval(loadData,60000);
+
+function saveCustom(list){
+  let custom = list.filter(c=>!builtin.includes(c));
+  localStorage.setItem('etf_list', JSON.stringify(custom));
+}
+
+async function toast(msg){
+  let t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+function showModal(){
+  document.getElementById('modalOverlay').classList.add('show');
+  document.getElementById('codeInput').focus();
+}
+function hideModal(){
+  document.getElementById('modalOverlay').classList.remove('show');
+  document.getElementById('codeInput').value='';
+}
+
+function addETF(){
+  let input=document.getElementById('codeInput');
+  let codes=input.value.trim().replace(/[，,]/g,',').split(',').map(c=>c.trim()).filter(c=>c.match(/^\d{6}$/));
+  if(!codes.length){toast('请输入正确的6位ETF代码'); return;}
+  let list=getList(); let added=[];
+  for(let c of codes){if(!list.includes(c)){list.push(c); added.push(c)}}
+  saveCustom(list);
+  toast(added.length?`已添加 ${added.join(', ')}`:'已在列表中');
+  hideModal();
+  refresh();
+}
+
+function delETF(code){
+  if(builtin.includes(code)) return;
+  let list=getList().filter(c=>c!==code);
+  saveCustom(list);
+  toast(`已移除 ${code}`);
+  refresh();
+}
+
+async function fetchKline(code, scale, n){
+  try{
+    let r=await fetch(`https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketData.getKLineData?symbol=sh${code}&scale=${scale}&datalen=${n}`);
+    return await r.json();
+  }catch(e){return null;}
+}
+
+function calcMA(arr,p){
+  let r=[];
+  for(let i=0;i<arr.length;i++){
+    if(i>=p-1){let s=0; for(let j=i-p+1;j<=i;j++) s+=arr[j]; r.push(s/p)}
+    else r.push(null);
+  }
+  return r;
+}
+
+let loading=false;
+async function refresh(){
+  if(loading) return; loading=true;
+  document.getElementById('list').innerHTML='<div class="spinner"></div>';
+  
+  let list = getList();
+  let results=[];
+  
+  for(let code of list){
+    try{
+      let d5=await fetchKline(code,5,100);
+      let d120=await fetchKline(code,120,120);
+      if(!d5||!d120||d5.length<20||d120.length<60){
+        results.push({code,name:names[code]||code,price:0,direction:'--',ma5:0,ma60:0,signal:'nodata',last_pnl:0});
+        continue;
+      }
+      
+      let c5=d5.map(x=>parseFloat(x.close));
+      let t5=d5.map(x=>x.day);
+      let c120=d120.map(x=>parseFloat(x.close));
+      let t120=d120.map(x=>x.day);
+      let ma5_5=calcMA(c5,5),ma60_5=calcMA(c5,60);
+      let ma5_120=calcMA(c120,5),ma60_120=calcMA(c120,60);
+      
+      let dirMap={};
+      for(let i=0;i<t120.length;i++){
+        if(ma5_120[i]!==null&&ma60_120[i]!==null) dirMap[t120[i]]=ma5_120[i]>ma60_120[i];
+      }
+      function getDir(ts){
+        let dt=new Date(ts.replace(' ','T'));
+        let best=null,bestDt=null;
+        for(let k in dirMap){
+          let kdt=new Date(k.replace(' ','T'));
+          if(kdt<=dt&&(!bestDt||kdt>bestDt)){best=k; bestDt=kdt;}
+        }
+        return dirMap[best];
+      }
+      
+      let curDir=getDir(t5[t5.length-1]);
+      let mv=ma5_5[ma5_5.length-1]||0,m60v=ma60_5[ma60_5.length-1]||0,price=c5[c5.length-1];
+      let direction=curDir?'多头':'空头';
+      let signal=(curDir&&mv>m60v)?'买入':'空仓';
+      
+      // 如果MA5>MA60但无方向，视为持仓
+      if(!curDir&&mv>m60v) signal='持仓';
+      
+      // 找上次盈亏
+      let daily={};
+      for(let i=0;i<t5.length;i++){let d=t5[i].substring(0,10);if(!daily[d])daily[d]=[];daily[d].push(i)}
+      let days=Object.keys(daily).sort();
+      let last_pnl=0,pos=false,ep=0,sd='';
+      for(let day of days){
+        let idxs=daily[day],last=idxs[idxs.length-1];
+        let dd=getDir(t5[last]); if(dd===null)continue;
+        let mv2=ma5_5[last],m60v2=ma60_5[last],p=c5[last];
+        if(mv2===null||m60v2===null)continue;
+        if(!pos){if(dd&&mv2>m60v2&&day!=sd){pos=true;ep=p;sd=day;}}
+        else{if(mv2<m60v2&&day!=sd){last_pnl=(p-ep)/ep*100;pos=false;sd=day;}}
+      }
+      if(pos) last_pnl=(c5[c5.length-1]-ep)/ep*100;
+      
+      results.push({code,name:names[code]||code,price,direction,ma5:mv,ma60:m60v,signal,last_pnl});
+    }catch(e){
+      results.push({code,name:names[code]||code,price:0,direction:'--',ma5:0,ma60:0,signal:'nodata',last_pnl:0});
+    }
+  }
+  
+  // 排序
+  let order={买入:0,持仓:1,空仓:2,nodata:3};
+  results.sort((a,b)=>(order[a.signal]||9)-(order[b.signal]||9));
+  
+  render(results);
+  loading=false;
+}
+
+function render(data){
+  let now=new Date();
+  document.getElementById('time').textContent='更新: '+now.toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  
+  let cntBuy=0,cntHold=0,cntWait=0;
+  let html='';
+  
+  for(let e of data){
+    if(e.signal==='买入')cntBuy++; else if(e.signal==='持仓')cntHold++; else cntWait++;
+    
+    let cardClass=e.signal==='买入'?'buy':(e.signal==='持仓'?'hold':'wait');
+    let badgeClass=e.signal==='买入'?'badge-buy':(e.signal==='持仓'?'badge-hold':'badge-wait');
+    let badgeText=e.signal;
+    
+    let dirColor=e.direction==='多头'?'red':'green';
+    let pnlColor=e.last_pnl>0?'red':(e.last_pnl<0?'green':'gold');
+    let priceColor=e.price>e.ma5?'red':'green';
+    let delBtn=builtin.includes(e.code)?'':`<button class="btn-danger" onclick="event.stopPropagation();delETF('${e.code}')" title="移除">✕</button>`;
+    
+    html+=`<div class="etf-card ${cardClass}">
+      <div class="row">
+        <div class="info"><span class="name">${e.name}</span><span class="code">${e.code}</span></div>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+        ${delBtn}
+      </div>
+      <div class="grid">
+        <div class="item"><div class="lbl">价格</div><div class="val ${priceColor}">${e.price.toFixed(3)}</div></div>
+        <div class="item"><div class="lbl">120分</div><div class="val ${dirColor}">${e.direction}</div></div>
+        <div class="item"><div class="lbl">MA5/MA60</div><div class="val">${e.ma5.toFixed(2)}/${e.ma60.toFixed(2)}</div></div>
+        <div class="item"><div class="lbl">价差</div><div class="val ${priceColor}">${(e.ma5-e.ma60).toFixed(3)}</div></div>
+        <div class="item"><div class="lbl">上次盈亏</div><div class="val ${pnlColor}">${e.last_pnl>0?'+':''}${e.last_pnl.toFixed(2)}%</div></div>
+        <div class="item"></div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('list').innerHTML=html||'<div class="empty-state"><div class="icon">📭</div>暂无ETF数据</div>';
+  document.getElementById('cntBuy').textContent=cntBuy;
+  document.getElementById('cntHold').textContent=cntHold;
+  document.getElementById('cntWait').textContent=cntWait;
+}
+
+refresh();
+setInterval(refresh, 120000);
 </script>
 </body>
 </html>
