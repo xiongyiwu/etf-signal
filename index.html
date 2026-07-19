@@ -103,8 +103,8 @@ header .sub{font-size:12px;color:var(--dim);margin-top:4px}
 <div class="toast" id="toast"></div>
 
 <script>
-const builtin = ['589720','159611','588170','515050','159819','159852','159869','512400','512710','515400','561380','563230'];
-const names = {589720:'科创创新药',159611:'广发电力',588170:'科创半导体',515050:'通信',159819:'人工智能',159852:'软件',159869:'游戏',512400:'有色',512710:'军工龙头',515400:'大数据',561380:'电网设备',563230:'卫星'};
+const builtin = ['589720','159611','588170','515050'];
+const names = {589720:'科创创新药',159611:'广发电力',588170:'科创半导体',515050:'通信'};
 const nameMap = JSON.parse(JSON.stringify(names));
 
 function getList(){let s=localStorage.getItem('etf_list'),c=s?JSON.parse(s):[];return[...new Set([...builtin,...c])]}
